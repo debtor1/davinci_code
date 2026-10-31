@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>다빈치 코드</title>
+<style>
+:root{--ink:#f3efe6;--muted:#a9b8ae;--gold:#e0b44c;--red:#ef6b62;--green:#5cc98a;--bt:#1b1b1d;--wt:#f4efe3}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;background:radial-gradient(ellipse at 50% 30%,#2a5242 0%,#14251e 75%) fixed;color:var(--ink);min-height:100vh}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:10px 16px;background:#2f5546;color:var(--ink);font-weight:600}
+button:hover{filter:brightness(1.15)}
+button.primary{background:var(--gold);color:#1d1606}
+button:disabled{opacity:.35;cursor:not-allowed;filter:none}
+header{display:flex;align-items:center;gap:10px;padding:12px 18px;flex-wrap:wrap;max-width:1140px;margin:0 auto}
+header h1{font-size:20px;margin:0}
+header .sp{flex:1}
+.pill{background:rgba(0,0,0,.25);padding:6px 12px;border-radius:999px;font-size:13px;color:var(--muted)}
+header button{padding:7px 12px;font-size:13px}
+main{max-width:1140px;margin:0 auto;padding:4px 16px 28px;display:grid;grid-template-columns:1fr 290px;gap:18px}
+@media(max-width:880px){main{grid-template-columns:1fr}}
+.board{display:flex;flex-direction:column;gap:16px}
+.seat{background:rgba(0,0,0,.18);border-radius:16px;padding:14px 16px;transition:box-shadow .2s}
+.seat.active{box-shadow:0 0 0 2px var(--gold) inset}
+.seat h2{margin:0 0 12px;font-size:15px;display:flex;gap:8px;align-items:center}
+.seat h2 small{color:var(--muted);font-weight:500}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;min-height:90px;padding-top:10px}
+.tile{width:50px;height:74px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;position:relative;user-select:none;transition:transform .18s,box-shadow .18s;box-shadow:0 3px 0 rgba(0,0,0,.4)}
+.tile.B{background:var(--bt);color:#fff;border:1px solid #3a3a3d}
+.tile.W{background:var(--wt);color:#1b1b1d;border:1px solid #cfc6b2}
+.tile.hidden.B{background:linear-gradient(145deg,#2c2c30,#111113)}
+.tile.hidden.W{background:linear-gradient(145deg,#fffaf0,#ddd5c2)}
+.tile .q{width:30px;height:50px;border-radius:5px;border:1px dashed currentColor;opacity:.25}
+.tile.open{transform:translateY(6px) rotate(-5deg);box-shadow:0 0 0 2px var(--gold),0 3px 0 rgba(0,0,0,.4)}
+.tile.new{box-shadow:0 0 0 3px var(--green),0 0 16px var(--green)}
+.tile.click{cursor:pointer}
+.tile.click:hover{transform:translateY(-7px);box-shadow:0 0 0 3px var(--gold),0 8px 12px rgba(0,0,0,.4)}
+.tile.target{animation:pulse .5s ease-in-out 3}
+.tile.ok{animation:ok .8s}
+.tile.bad{animation:bad .5s}
+@keyframes pulse{50%{transform:translateY(-8px);box-shadow:0 0 0 3px var(--gold),0 0 18px var(--gold)}}
+@keyframes ok{0%{transform:scale(1)}40%{transform:scale(1.25);box-shadow:0 0 22px var(--green)}}
+@keyframes bad{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+.badge{position:absolute;top:-10px;left:50%;transform:translateX(-50%);font-size:10px;padding:1px 6px;border-radius:6px;font-weight:700;white-space:nowrap;line-height:1.5}
+.badge.new{background:var(--green);color:#063}
+.badge.open{background:var(--red);color:#fff}
+.tile .pos{position:absolute;bottom:-18px;font-size:11px;color:var(--muted);font-weight:500}
+.slot{width:24px;height:74px;border-radius:6px;border:2px dashed var(--gold);color:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:800;background:rgba(224,180,76,.08);padding:0}
+.center{display:flex;align-items:center;gap:18px;padding:6px 4px;flex-wrap:wrap}
+.deck{width:62px;height:86px;border-radius:9px;background:repeating-linear-gradient(45deg,#3b2f1a,#3b2f1a 6px,#4a3b21 6px,#4a3b21 12px);border:2px solid var(--gold);display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;font-size:22px;color:var(--gold);transition:transform .15s}
+.deck small{font-size:10px;font-weight:600}
+.deck.click{cursor:pointer;animation:pulse 1.4s ease-in-out infinite}
+.deck.empty{opacity:.3}
+.status{flex:1;min-width:220px}
+.status .msg{font-size:16px;font-weight:700;margin-bottom:4px}
+.status .sub{font-size:13px;color:var(--muted);margin-bottom:10px;min-height:18px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+aside{background:rgba(0,0,0,.22);border-radius:16px;padding:14px;max-height:640px;overflow:auto}
+aside h3{margin:0 0 8px;font-size:14px;color:var(--muted)}
+.log div{font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);line-height:1.45}
+.c-ok{color:var(--green)}.c-bad{color:var(--red)}.c-sys{color:var(--muted)}
+.overlay{position:fixed;inset:0;background:rgba(5,12,9,.84);display:flex;align-items:center;justify-content:center;z-index:10;padding:16px}
+.overlay[hidden]{display:none}
+.card{background:#1f3a2f;border-radius:18px;padding:26px;max-width:460px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.5);text-align:center;max-height:92vh;overflow:auto}
+.card h2{margin:0 0 6px;font-size:22px}
+.card p{color:var(--muted);margin:6px 0 18px;line-height:1.5}
+.modes{display:grid;gap:12px;text-align:left}
+.modebox{background:#2a4b3d;border-radius:14px;padding:16px}
+.modebox b{display:block;font-size:17px;margin-bottom:2px}
+.modebox span{font-size:13px;color:var(--muted)}
+.modebox .go{margin-top:12px;width:100%}
+.diff{display:flex;gap:6px;margin-top:12px}
+.diff button{flex:1;padding:8px;font-size:14px;background:#1d3a2e}
+.diff button.sel{background:var(--gold);color:#1d1606}
+.picker{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}
+.picker button{padding:14px 0;font-size:20px;font-weight:800;border-radius:8px}
+.picker button.B{background:var(--bt);color:#fff;border:1px solid #444}
+.picker button.W{background:var(--wt);color:#1b1b1d}
+.picker button.joker{grid-column:span 4;font-size:16px}
+.toggle{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center;cursor:pointer}
+.rules{text-align:left;font-size:14px;line-height:1.6;color:#dfe7e1}
+.rules h4{margin:14px 0 4px;color:var(--gold)}
+.rules ul{margin:0;padding-left:18px}
+.inp{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid #3d6656;background:#16302a;color:var(--ink);min-width:0}
+.netrow{display:flex;gap:8px;margin-top:10px}
+.netrow .inp{flex:1}
+.netmsg{font-size:13px;color:var(--gold);margin-top:8px;min-height:18px}
+.code{font-size:44px;font-weight:800;letter-spacing:.25em;color:var(--gold);margin:8px 0;font-family:ui-monospace,Menlo,monospace}
+.final{display:flex;flex-direction:column;gap:10px;margin:14px 0;text-align:left}
+.final .row{min-height:0;padding-top:4px;gap:5px}
+.final .tile{width:34px;height:50px;font-size:17px}
+.final .tile.open{transform:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>🔢 다빈치 코드</h1>
+  <span class="pill" id="modeInfo">-</span>
+  <span class="sp"></span>
+  <label class="toggle"><input type="checkbox" id="hintChk" checked> 불가능한 숫자 흐리게</label>
+  <button id="soundBtn">🔊</button>
+  <button id="rulesBtn">규칙</button>
+  <button id="menuBtn">새 게임</button>
+</header>
+
+<main>
+  <div class="board">
+    <section class="seat" id="oppSeat"><h2 id="oppName"></h2><div class="row" id="oppRow"></div></section>
+    <section class="center">
+      <div class="deck" id="deck"><span id="deckCount">0</span><small>남은 타일</small></div>
+      <div class="status">
+        <div class="msg" id="msg"></div>
+        <div class="sub" id="sub"></div>
+        <div class="actions" id="actions"></div>
+      </div>
+    </section>
+    <section class="seat" id="meSeat"><h2 id="meName"></h2><div class="row" id="meRow"></div></section>
+  </div>
+  <aside><h3>게임 기록</h3><div class="log" id="log"></div></aside>
+</main>
+
+<!-- 모드 선택 -->
+<div class="overlay" id="menu">
+  <div class="card">
+    <h2>다빈치 코드</h2>
+    <p>상대의 비밀 코드를 먼저 모두 알아내면 승리!</p>
+    <div class="modes">
+      <div class="modebox">
+        <b>👥 2인 대전</b>
+        <span>한 화면에서 두 사람이 번갈아 플레이해요. 턴이 바뀔 때 화면을 가려줍니다.</span>
+        <button class="primary go" id="goPvp">2인 대전 시작</button>
+      </div>
+      <div class="modebox">
+        <b>🤖 AI 대전</b>
+        <span>컴퓨터와 1:1로 대결해요. 난이도를 고르세요.</span>
+        <div class="diff" id="diffSel">
+          <button data-d="easy">쉬움</button>
+          <button data-d="normal" class="sel">보통</button>
+          <button data-d="hard">어려움</button>
+        </div>
+        <button class="primary go" id="goAi">AI 대전 시작</button>
+      </div>
+      <div class="modebox" id="onlineBox">
+        <b>🌐 온라인 대전</b>
+        <span>다른 기기의 친구와 대결해요. 방을 만들고 초대 링크를 보내면 끝! (로그인 필요 없음)</span>
+        <div class="netrow"><input class="inp" id="nick" maxlength="10" placeholder="내 닉네임"></div>
+        <div class="netrow">
+          <button class="primary" id="hostBtn" disabled>방 만들기</button>
+          <input class="inp" id="codeIn" maxlength="4" placeholder="방 코드" autocomplete="off" style="text-transform:uppercase">
+          <button id="joinBtn" disabled>참가</button>
+        </div>
+        <div class="netmsg" id="netMsg">불러오는 중…</div>
+      </div>
+    </div>
+    <button id="menuClose" style="margin-top:14px" hidden>현재 게임으로 돌아가기</button>
+  </div>
+</div>
+
+<!-- 온라인 대기 -->
+<div class="overlay" id="waitOv" hidden>
+  <div class="card">
+    <h2 id="waitTitle"></h2>
+    <div class="code" id="waitCode"></div>
+    <p id="waitText"></p>
+    <div class="sub" id="netStatus" style="font-size:12px;color:var(--muted);margin:0 0 14px"></div>
+    <div class="actions" style="justify-content:center">
+      <button class="primary" id="copyBtn" hidden>초대 링크 복사</button>
+      <button id="waitCancel">취소</button>
+    </div>
+  </div>
+</div>
+
+<!-- 알림 -->
+<div class="overlay" id="noticeOv" hidden>
+  <div class="card">
+    <h2 id="noticeTitle"></h2>
+    <p id="noticeText"></p>
+    <button class="primary" id="noticeBtn">모드 선택으로</button>
+  </div>
+</div>
+
+<!-- 턴 넘기기 (2인) -->
+<div class="overlay" id="handover" hidden>
+  <div class="card">
+    <h2 id="hoTitle"></h2>
+    <p id="hoText">상대가 화면을 보지 않도록 기기를 넘겨주세요.</p>
+    <button class="primary" id="hoBtn">준비됐어요 – 내 타일 보기</button>
+  </div>
+</div>
+
+<!-- 숫자 고르기 -->
+<div class="overlay" id="pickerOv" hidden>
+  <div class="card">
+    <h2 id="pkTitle">숫자를 추리하세요</h2>
+    <p id="pkText"></p>
+    <div class="picker" id="picker"></div>
+    <button id="pkCancel">취소</button>
+  </div>
+</div>
+
+<!-- 게임 종료 -->
+<div class="overlay" id="overOv" hidden>
+  <div class="card">
+    <h2 id="overTitle"></h2>
+    <p id="overText"></p>
+    <div class="final" id="finalHands"></div>
+    <div class="actions" style="justify-content:center">
+      <button class="primary" id="againBtn">다시 하기</button>
+      <button id="toMenuBtn">모드 선택</button>
+    </div>
+  </div>
+</div>
+
+<!-- 규칙 -->
+<div class="overlay" id="rulesOv" hidden>
+  <div class="card">
+    <h2>게임 규칙</h2>
+    <div class="rules">
+      <h4>준비</h4>
+      <ul>
+        <li>흰색·검은색 숫자 타일(0~11) 24개를 섞고 각자 4개씩 가져갑니다.</li>
+        <li>타일은 왼쪽이 작은 수, 오른쪽이 큰 수로 자동 정렬돼요. 같은 숫자면 검은색이 왼쪽입니다.</li>
+        <li>조커 2개(–)는 나눠준 뒤 더미에 섞어 넣습니다.</li>
+      </ul>
+      <h4>내 차례</h4>
+      <ul>
+        <li>① 더미에서 타일 1개를 가져와 순서에 맞게 끼웁니다. (조커는 원하는 자리에 직접 놓고, 이후 옮길 수 없어요)</li>
+        <li>② 상대의 숨겨진 타일 하나를 골라 숫자(또는 조커)를 추리합니다.</li>
+        <li>맞히면 그 타일이 공개되고, <b>계속 추리</b>하거나 <b>차례 마치기</b>를 고릅니다.</li>
+        <li>틀리면 이번에 가져온 내 타일이 공개되고 차례가 넘어갑니다.</li>
+        <li>더미가 비면 가져오기를 생략하고, 틀렸을 때 내 숨겨진 타일 중 하나를 골라 공개합니다.</li>
+      </ul>
+      <h4>승리</h4>
+      <ul><li>상대의 모든 타일을 먼저 공개시키면 승리!</li></ul>
+    </div>
+    <button class="primary" id="rulesClose" style="margin-top:16px">닫기</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const DIFF_NAME = { easy: '쉬움', normal: '보통', hard: '어려움' };
+let S = null, NET = null, uid = 0, selDiff = 'normal', lastSettings = null, soundOn = true, actx = null;
+
+/* ---------- 사운드 ---------- */
+function beep(kind) {
+  if (!soundOn) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const notes = { ok: [660, 880], bad: [220, 160], draw: [520], win: [523, 659, 784, 1046] }[kind] || [440];
+    notes.forEach((f, i) => {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = kind === 'bad' ? 'sawtooth' : 'triangle'; o.frequency.value = f;
+      const t = actx.currentTime + i * 0.11;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.15, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+      o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.2);
+    });
+  } catch (e) {}
+}
+
+/* ---------- 규칙 로직 ---------- */
+const makeTile = (color, num) => ({ id: uid++, color, num, joker: num === null, revealed: false });
+const key = t => t.num * 2 + (t.color === 'B' ? 0 : 1);
+const label = v => v === 'J' ? '조커' : String(v);
+const tileName = t => (t.color === 'B' ? '검은' : '흰') + ' ' + (t.joker ? '조커' : t.num);
+const esc = x => String(x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function setFx(id, kind) { S.fx[id] = kind; S.fxq.push([++S.fxn, id, kind]); if (S.fxq.length > 8) S.fxq.shift(); }
+const subj = n => n === '나' ? '내가' : n + '이(가)';
+const colorName = c => c === 'B' ? '검은' : '흰';
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const hidden = p => S.players[p].hand.filter(t => !t.revealed);
+const allOpen = p => hidden(p).length === 0;
+
+function newGame(mode, diff, names) {
+  if (mode !== 'online') leaveOnline();
+  uid = 0;
+  lastSettings = { mode, diff };
+  const deck = [];
+  for (const c of ['B', 'W']) for (let n = 0; n <= 11; n++) deck.push(makeTile(c, n));
+  shuffle(deck);
+  const players = mode === 'ai'
+    ? [{ name: '나', ai: false, hand: [] }, { name: `AI (${DIFF_NAME[diff]})`, ai: true, hand: [] }]
+    : mode === 'online'
+    ? [{ name: names[0], ai: false, hand: [] }, { name: names[1], ai: false, hand: [] }]
+    : [{ name: '플레이어 1', ai: false, hand: [] }, { name: '플레이어 2', ai: false, hand: [] }];
+  for (const p of players) { for (let i = 0; i < 4; i++) p.hand.push(deck.pop()); p.hand.sort((a, b) => key(a) - key(b)); }
+  deck.push(makeTile('B', null), makeTile('W', null));
+  shuffle(deck);
+  S = { mode, diff, deck, players, cur: Math.floor(Math.random() * 2), drawn: null, phase: 'draw',
+        wrong: {}, over: false, winner: null, busy: false, fx: {}, fxq: [], fxn: 0, logq: [], logn: 0, handover: false,
+        gid: Math.random().toString(36).slice(2, 8) };
+  ['menu', 'overOv', 'waitOv', 'noticeOv'].forEach(id => $(id).hidden = true);
+  $('log').textContent = '';
+  addLog(`게임 시작! ${S.players[S.cur].name}부터 시작합니다.`, 'sys');
+  if (mode === 'pvp') { S.handover = true; showHandover(); }
+  startTurn();
+}
+
+function insertNumber(hand, t) {
+  const k = key(t);
+  for (let i = 0; i <= hand.length; i++) {
+    const okL = hand.slice(0, i).every(u => u.joker || key(u) < k);
+    const okR = hand.slice(i).every(u => u.joker || key(u) > k);
+    if (okL && okR) { hand.splice(i, 0, t); return i; }
+  }
+  hand.push(t); return hand.length - 1;
+}
+
+/* guesser 입장에서 target 타일이 될 수 있는 값들 */
+function candidates(g, tp, ti, useOrder = true) {
+  const hand = S.players[tp].hand, t = hand[ti];
+  const known = new Set();
+  for (const u of S.players[g].hand) known.add(u.color + (u.joker ? 'J' : u.num));
+  for (const p of S.players) for (const u of p.hand) if (u.revealed) known.add(u.color + (u.joker ? 'J' : u.num));
+  const wrong = S.wrong[t.id] || new Set();
+  let lo = -1, hi = 99;
+  if (useOrder) {
+    for (let j = 0; j < ti; j++) { const u = hand[j]; if (u.revealed && !u.joker) lo = Math.max(lo, key(u)); }
+    for (let j = ti + 1; j < hand.length; j++) { const u = hand[j]; if (u.revealed && !u.joker) hi = Math.min(hi, key(u)); }
+  }
+  const res = [];
+  for (let v = 0; v <= 11; v++) {
+    const k = v * 2 + (t.color === 'B' ? 0 : 1);
+    if (k > lo && k < hi && !known.has(t.color + v) && !wrong.has(v)) res.push(v);
+  }
+  if (!known.has(t.color + 'J') && !wrong.has('J')) res.push('J');
+  return res;
+}
+
+function startTurn() {
+  S.drawn = null;
+  const p = S.players[S.cur];
+  if (S.deck.length) S.phase = 'draw';
+  else { S.phase = 'guess'; addLog(`더미가 비어 ${p.name}은(는) 타일을 가져오지 않습니다.`, 'sys'); }
+  render();
+  if (p.ai && !S.handover) aiTurn();
+}
+
+function drawTile() {
+  const t = S.deck.pop(), p = S.players[S.cur];
+  S.drawn = t; beep('draw');
+  if (t.joker) {
+    addLog(`${subj(p.name)} 조커를 뽑았습니다.`, 'sys');
+    if (p.ai) { p.hand.splice(Math.floor(Math.random() * (p.hand.length + 1)), 0, t); S.phase = 'guess'; }
+    else S.phase = 'placeJoker';
+  } else {
+    insertNumber(p.hand, t);
+    addLog(`${subj(p.name)} 타일을 1개 가져왔습니다.`, 'sys');
+    S.phase = 'guess';
+  }
+  render();
+}
+
+function placeJoker(idx) {
+  const p = S.players[S.cur];
+  p.hand.splice(idx, 0, S.drawn);
+  S.phase = 'guess';
+  render();
+}
+
+/* 반환: 'ok' | 'wrong' | 'over' */
+function doGuess(tp, ti, val) {
+  const g = S.cur, gp = S.players[g], tpP = S.players[tp], t = tpP.hand[ti];
+  const correct = t.joker ? val === 'J' : t.num === val;
+  const pos = ti + 1;
+  if (correct) {
+    t.revealed = true; setFx(t.id, 'ok'); beep('ok');
+    addLog(`${gp.name}: ${tpP.name}의 ${pos}번째 타일 → ${label(val)} ✅ 정답!`, 'ok');
+    if (allOpen(tp)) { endGame(g); return 'over'; }
+    S.phase = 'decide'; render(); return 'ok';
+  }
+  (S.wrong[t.id] = S.wrong[t.id] || new Set()).add(val);
+  setFx(t.id, 'bad'); beep('bad');
+  addLog(`${gp.name}: ${tpP.name}의 ${pos}번째 타일 → ${label(val)} ❌ 오답`);
+  if (S.drawn) {
+    S.drawn.revealed = true; setFx(S.drawn.id, 'bad');
+    addLog(`${gp.name}의 ${tileName(S.drawn)} 타일이 공개됩니다.`, 'bad');
+    if (allOpen(g)) { endGame(tp); return 'over'; }
+    finishTurn(); return 'wrong';
+  }
+  // 더미가 빈 경우: 자기 타일 하나 선택 공개
+  if (gp.ai) {
+    const h = hidden(g); const t2 = h[Math.floor(Math.random() * h.length)];
+    revealOwn(t2); return allOpen(g) ? 'over' : 'wrong';
+  }
+  S.phase = 'revealOwn'; render(); return 'wrong';
+}
+
+function revealOwn(t) {
+  const g = S.cur;
+  t.revealed = true; setFx(t.id, 'bad');
+  addLog(`${S.players[g].name}의 ${tileName(t)} 타일이 공개됩니다.`, 'bad');
+  if (allOpen(g)) { endGame(1 - g); return; }
+  finishTurn();
+}
+
+function finishTurn() {
+  S.drawn = null;
+  S.cur = 1 - S.cur;
+  if (S.mode === 'pvp') { S.handover = true; render(); showHandover(); }
+  startTurn();
+}
+
+function endGame(w) {
+  S.over = true; S.winner = w; S.phase = 'over';
+  addLog(`🏆 ${S.players[w].name} 승리!`, 'ok');
+  render(); beep('win');
+  setTimeout(showOver, 900);
+}
+
+/* ---------- AI ---------- */
+/* 몬테카를로: 상대 숨김 타일 배치를 무작위로 여러 번 만들어 각 타일·값의 확률 추정 */
+function estimate(g) {
+  const tp = 1 - g, hand = S.players[tp].hand;
+  const known = new Set();
+  for (const u of S.players[g].hand) known.add(u.id);
+  for (const p of S.players) for (const u of p.hand) if (u.revealed) known.add(u.id);
+  const pool = [];
+  for (const c of ['B', 'W']) { for (let n = 0; n <= 11; n++) pool.push({ color: c, num: n, joker: false }); pool.push({ color: c, num: null, joker: true }); }
+  const seen = new Set();
+  for (const p of S.players) for (const u of p.hand) if (known.has(u.id)) seen.add(u.color + (u.joker ? 'J' : u.num));
+  const free = pool.filter(t => !seen.has(t.color + (t.joker ? 'J' : t.num)));
+  const counts = {}; let ok = 0;
+  for (let it = 0; it < 4000 && ok < 1500; it++) {
+    const used = new Set(), assign = {}; let prev = -1, fail = false;
+    for (let i = 0; i < hand.length && !fail; i++) {
+      const t = hand[i];
+      if (t.revealed) { if (!t.joker) { if (key(t) <= prev) { fail = true; } prev = key(t); } continue; }
+      let hi = 99;
+      for (let j = i + 1; j < hand.length; j++) if (hand[j].revealed && !hand[j].joker) { hi = key(hand[j]); break; }
+      const wrong = S.wrong[t.id] || new Set();
+      const opts = free.filter(f => f.color === t.color && !used.has(f.color + (f.joker ? 'J' : f.num)) && !wrong.has(f.joker ? 'J' : f.num)
+        && (f.joker || (key(f) > prev && key(f) < hi)));
+      if (!opts.length) { fail = true; break; }
+      // 조커는 실제 확률이 낮으므로 가중치를 낮춤
+      const w = opts.map(f => f.joker ? 0.35 : 1), tot = w.reduce((a, b) => a + b, 0);
+      let r = Math.random() * tot, f = opts[0];
+      for (let k = 0; k < opts.length; k++) { r -= w[k]; if (r <= 0) { f = opts[k]; break; } }
+      used.add(f.color + (f.joker ? 'J' : f.num));
+      assign[i] = f.joker ? 'J' : f.num;
+      if (!f.joker) prev = key(f);
+    }
+    if (fail) continue;
+    ok++;
+    for (const i in assign) { counts[i] = counts[i] || {}; counts[i][assign[i]] = (counts[i][assign[i]] || 0) + 1; }
+  }
+  if (!ok) return null;
+  let best = null;
+  for (const i in counts) for (const v in counts[i]) {
+    const p = counts[i][v] / ok;
+    if (!best || p > best.p) best = { ti: +i, val: v === 'J' ? 'J' : +v, p };
+  }
+  return best;
+}
+
+function aiPick(g) {
+  if (S.diff === 'hard') {
+    const e = estimate(g);
+    if (e) return { tp: 1 - g, ti: e.ti, val: e.val, p: e.p };
+  }
+  const tp = 1 - g, hand = S.players[tp].hand, opts = [];
+  hand.forEach((t, i) => { if (!t.revealed) opts.push({ i, c: candidates(g, tp, i, S.diff !== 'easy') }); });
+  let pick;
+  if (S.diff === 'easy') pick = opts[Math.floor(Math.random() * opts.length)];
+  else {
+    const min = Math.min(...opts.map(o => o.c.length));
+    const best = opts.filter(o => o.c.length === min);
+    pick = best[Math.floor(Math.random() * best.length)];
+  }
+  let c = pick.c;
+  if (S.diff === 'normal' && c.length > 1 && c.includes('J')) {
+    const nums = c.filter(v => v !== 'J'); if (nums.length && Math.random() < 0.8) c = nums; // 조커는 드물게
+  }
+  return { tp, ti: pick.i, val: c[Math.floor(Math.random() * c.length)], n: pick.c.length };
+}
+
+function aiShouldContinue(g) {
+  const tp = 1 - g, hand = S.players[tp].hand;
+  const counts = hand.map((t, i) => t.revealed ? 99 : candidates(g, tp, i).length);
+  const min = Math.min(...counts);
+  const noPenaltyLeft = !S.drawn; // 이번 턴에 뽑은 타일이 없으면 틀릴 때 다른 타일을 공개해야 함
+  if (S.diff === 'easy') return Math.random() < 0.35;
+  if (S.diff === 'normal') return min === 1 || (min === 2 && Math.random() < 0.35);
+  const e = estimate(g);
+  if (!e) return min === 1;
+  const lead = hidden(g).length - hidden(tp).length;
+  return e.p >= 0.6 || (e.p >= 0.45 && !noPenaltyLeft) || (e.p >= 0.35 && lead >= 2);
+}
+
+async function aiTurn() {
+  S.busy = true; render();
+  const g = S.cur, G = S;
+  const gone = () => S !== G;
+  await sleep(900); if (gone()) return;
+  if (S.phase === 'draw') { drawTile(); await sleep(800); if (gone()) return; }
+  while (!S.over) {
+    const { tp, ti, val } = aiPick(g);
+    S.fx[S.players[tp].hand[ti].id] = 'target'; render();
+    await sleep(1300); if (gone()) return;
+    const r = doGuess(tp, ti, val);
+    if (r !== 'ok') break;
+    await sleep(1000); if (gone()) return;
+    if (!aiShouldContinue(g)) { addLog(`${subj(S.players[g].name)} 차례를 마칩니다.`, 'sys'); S.busy = false; finishTurn(); return; }
+    addLog(`${subj(S.players[g].name)} 계속 추리합니다.`, 'sys');
+  }
+  S.busy = false; render();
+}
+
+/* ---------- 화면 ---------- */
+function addLog(text, cls) {
+  if (S) { S.logq.push([++S.logn, text, cls || '']); if (S.logq.length > 6) S.logq.shift(); }
+  logLine(text, cls);
+}
+function logLine(text, cls) {
+  const d = document.createElement('div');
+  if (cls) d.className = 'c-' + cls;
+  d.textContent = text;
+  $('log').prepend(d);
+}
+
+function viewer() { return S.mode === 'ai' ? 0 : S.mode === 'online' ? NET.me : S.cur; }
+
+function tileEl(t, faceUp, { mine = false, idx = null } = {}) {
+  const el = document.createElement('div');
+  el.className = `tile ${t.color}` + (faceUp ? '' : ' hidden') + (t.revealed ? ' open' : '');
+  if (faceUp) el.textContent = t.joker ? '–' : t.num;
+  else { const q = document.createElement('div'); q.className = 'q'; el.appendChild(q); }
+  if (S.drawn === t && !t.revealed) { el.classList.add('new'); el.insertAdjacentHTML('beforeend', '<span class="badge new">NEW</span>'); }
+  if (mine && t.revealed) el.insertAdjacentHTML('beforeend', '<span class="badge open">공개</span>');
+  if (idx !== null) el.insertAdjacentHTML('beforeend', `<span class="pos">${idx + 1}</span>`);
+  const fx = S.fx[t.id];
+  if (fx) { el.classList.add(fx); delete S.fx[t.id]; }
+  return el;
+}
+
+function render() {
+  if (!S) return;
+  if (S.mode === 'online' && NET && NET.role === 'host') publish();
+  const v = viewer(), o = 1 - v, me = S.players[v], op = S.players[o];
+  const myTurn = S.cur === v && !me.ai && !S.over && !S.handover && !S.busy && !(NET && NET.pending);
+  $('modeInfo').textContent = S.mode === 'ai' ? `AI 대전 · ${DIFF_NAME[S.diff]}` : S.mode === 'online' ? `온라인 대전 · 방 ${NET.code}` : '2인 대전';
+  $('oppName').innerHTML = `${S.mode === 'ai' ? '🤖' : '👤'} ${esc(op.name)} <small>숨김 ${hidden(o).length} / ${op.hand.length}</small>`;
+  $('meName').innerHTML = `🙂 ${esc(me.name)} <small>숨김 ${hidden(v).length} / ${me.hand.length}</small>`;
+  $('oppSeat').classList.toggle('active', S.cur === o && !S.over);
+  $('meSeat').classList.toggle('active', S.cur === v && !S.over);
+
+  // 상대 줄
+  const oppRow = $('oppRow'); oppRow.innerHTML = '';
+  op.hand.forEach((t, i) => {
+    const show = t.revealed || S.over || S.handover && false;
+    const el = tileEl(t, show, { idx: i });
+    if (myTurn && (S.phase === 'guess' || S.phase === 'decide') && !t.revealed) {
+      el.classList.add('click'); el.onclick = () => openPicker(o, i);
+    }
+    oppRow.appendChild(el);
+  });
+
+  // 내 줄 (2인 모드에서 턴 전환 중에는 가림)
+  const meRow = $('meRow'); meRow.innerHTML = '';
+  const conceal = S.handover;
+  const placing = myTurn && S.phase === 'placeJoker';
+  me.hand.forEach((t, i) => {
+    if (placing) meRow.appendChild(slotEl(i));
+    const el = tileEl(t, !conceal || t.revealed, { mine: true });
+    if (myTurn && S.phase === 'revealOwn' && !t.revealed) { el.classList.add('click'); el.onclick = () => act('reveal', t.id); }
+    meRow.appendChild(el);
+  });
+  if (placing) meRow.appendChild(slotEl(me.hand.length));
+
+  // 더미
+  const deck = $('deck');
+  $('deckCount').textContent = S.deck.length;
+  deck.classList.toggle('empty', !S.deck.length);
+  deck.classList.toggle('click', myTurn && S.phase === 'draw');
+  deck.onclick = myTurn && S.phase === 'draw' ? () => act('draw') : null;
+
+  // 상태 메시지 & 버튼
+  const msg = $('msg'), sub = $('sub'), actEl = $('actions');
+  actEl.innerHTML = ''; sub.textContent = '';
+  const cp = S.players[S.cur];
+  if (S.over) { msg.textContent = `🏆 ${S.players[S.winner].name} 승리!`; addBtn('결과 보기', showOver, true); return; }
+  if (S.handover) { msg.textContent = `${cp.name} 차례를 기다리는 중…`; return; }
+  if (NET && NET.pending) { msg.textContent = '전송 중…'; return; }
+  if (!myTurn) { msg.textContent = `${cp.name} 생각 중…`; sub.textContent = '상대의 추리를 지켜보세요.'; return; }
+  switch (S.phase) {
+    case 'draw':
+      msg.textContent = '타일을 1개 가져오세요';
+      sub.textContent = '가운데 더미를 누르거나 버튼을 누르세요.';
+      addBtn('타일 가져오기', () => act('draw'), true); break;
+    case 'placeJoker':
+      msg.textContent = `${colorName(S.drawn.color)} 조커를 뽑았어요!`;
+      sub.textContent = '내 줄에서 조커를 놓을 자리(+)를 고르세요. 한 번 놓으면 옮길 수 없어요.'; break;
+    case 'guess':
+      msg.textContent = '상대 타일을 골라 추리하세요';
+      sub.textContent = '위쪽 상대의 숨겨진 타일을 누르세요.'; break;
+    case 'decide':
+      msg.textContent = '정답! 어떻게 할까요?';
+      sub.textContent = S.drawn ? '계속 추리하다 틀리면 이번에 가져온 타일이 공개돼요.' : '계속 추리하다 틀리면 내 타일 하나를 공개해야 해요.';
+      addBtn('계속 추리하기', () => act('cont'), true);
+      addBtn('차례 마치기', () => act('end'));
+      break;
+    case 'revealOwn':
+      msg.textContent = '틀렸어요. 공개할 내 타일을 고르세요';
+      sub.textContent = '더미가 비어 있어서 내 숨겨진 타일 중 하나를 직접 공개해야 해요.'; break;
+  }
+}
+
+function slotEl(i) {
+  const b = document.createElement('button');
+  b.className = 'slot'; b.textContent = '+'; b.title = '여기에 조커 놓기';
+  b.onclick = () => act('joker', i);
+  return b;
+}
+function addBtn(text, fn, primary) {
+  const b = document.createElement('button');
+  b.textContent = text; if (primary) b.className = 'primary'; b.onclick = fn;
+  $('actions').appendChild(b);
+}
+
+function openPicker(tp, ti) {
+  const t = S.players[tp].hand[ti];
+  const cands = new Set(candidates(S.cur, tp, ti));
+  const useHint = $('hintChk').checked;
+  $('pkTitle').textContent = `${S.players[tp].name}의 ${ti + 1}번째 타일`;
+  $('pkText').textContent = `${colorName(t.color)} 타일이에요. 숫자를 골라주세요.`;
+  const pk = $('picker'); pk.innerHTML = '';
+  [...Array(12).keys(), 'J'].forEach(v => {
+    const b = document.createElement('button');
+    b.className = t.color + (v === 'J' ? ' joker' : '');
+    b.textContent = v === 'J' ? '– 조커' : v;
+    if (useHint && !cands.has(v)) b.disabled = true;
+    b.onclick = () => { $('pickerOv').hidden = true; act('guess', tp, ti, v); };
+    pk.appendChild(b);
+  });
+  $('pickerOv').hidden = false;
+}
+
+function showHandover() {
+  $('hoTitle').textContent = `${S.players[S.cur].name} 차례`;
+  $('handover').hidden = false;
+}
+
+function showOver() {
+  const w = S.players[S.winner];
+  const meWin = S.mode === 'online' ? S.winner === NET.me : S.mode === 'ai' ? S.winner === 0 : true;
+  $('overTitle').textContent = S.mode !== 'pvp' ? (meWin ? '🎉 승리했어요!' : (S.mode === 'ai' ? '😢 AI가 이겼어요' : `😢 ${w.name} 승리`)) : `🏆 ${w.name} 승리!`;
+  $('overText').textContent = '모든 비밀 코드를 공개합니다.';
+  const f = $('finalHands'); f.innerHTML = '';
+  S.players.forEach(p => {
+    const box = document.createElement('div');
+    box.innerHTML = `<b>${esc(p.name)}</b>`;
+    const row = document.createElement('div'); row.className = 'row';
+    p.hand.forEach(t => row.appendChild(tileEl(t, true)));
+    box.appendChild(row); f.appendChild(box);
+  });
+  $('againBtn').hidden = S.mode === 'online' && NET && NET.role === 'guest';
+  if (S.mode === 'online' && NET && NET.role === 'guest') $('overText').textContent = '방장이 [다시 하기]를 누르면 새 게임이 시작돼요.';
+  $('overOv').hidden = false;
+}
+
+
+/* ---------- 행동 처리 (로컬 / 온라인) ---------- */
+function act(type, a, b, c) {
+  if (S.mode === 'online' && NET && NET.role === 'guest') {
+    if (type === 'cont') { S.phase = 'guess'; render(); return; } // 서버 상태와 같음: 바로 반영
+    NET.seq++;
+    NET.pending = true;
+    send({ t: 'act', act: { seq: NET.seq, gid: S.gid, type, a: a ?? null, b: b ?? null, c: c ?? null } });
+    render();
+    setTimeout(() => { if (NET && NET.pending) { NET.pending = false; send({ t: 'sync' }); render(); } }, 5000);
+    return;
+  }
+  applyAct(type, a, b, c);
+}
+
+function applyAct(type, a, b, c) {
+  const p = S.players[S.cur];
+  switch (type) {
+    case 'draw': if (S.phase === 'draw' && S.deck.length) drawTile(); break;
+    case 'joker': if (S.phase === 'placeJoker' && Number.isInteger(a) && a >= 0 && a <= p.hand.length) placeJoker(a); break;
+    case 'guess': {
+      const tp = 1 - S.cur, hand = S.players[tp].hand;
+      const okVal = c === 'J' || (Number.isInteger(c) && c >= 0 && c <= 11);
+      if ((S.phase === 'guess' || S.phase === 'decide') && a === tp && Number.isInteger(b) && hand[b] && !hand[b].revealed && okVal) doGuess(tp, b, c);
+      break;
+    }
+    case 'cont': if (S.phase === 'decide') { S.phase = 'guess'; render(); } break;
+    case 'end': if (S.phase === 'decide') { addLog(`${subj(p.name)} 차례를 마칩니다.`, 'sys'); finishTurn(); } break;
+    case 'reveal': {
+      const t = p.hand.find(u => u.id === a && !u.revealed);
+      if (S.phase === 'revealOwn' && t) revealOwn(t);
+      break;
+    }
+  }
+}
+
+/* ---------- 온라인 (PeerJS, P2P) ---------- */
+const PEER_PREFIX = 'davinci-code-kr-v1-';
+const PEER_OPTS = { debug: 1, config: { iceServers: [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+] } };
+function netMsg(t) { $('netMsg').textContent = t; }
+function netStatus(t) { const el = $('netStatus'); if (el) el.textContent = t || ''; }
+function nick(fallback) { return ($('nick').value.trim() || fallback).slice(0, 10); }
+const newCode = () => Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random() * 24)]).join('');
+function inviteLink(code) { return location.origin + location.pathname + '#' + code; }
+
+function send(obj) { try { if (NET && NET.conn && NET.conn.open) NET.conn.send(obj); } catch (e) {} }
+
+function leaveOnline() {
+  if (!NET) return;
+  const n = NET; NET = null;
+  if (n.timer) clearTimeout(n.timer);
+  if (n.hb) clearInterval(n.hb);
+  try { if (n.conn) n.conn.close(); } catch (e) {}
+  try { if (n.peer) n.peer.destroy(); } catch (e) {}
+}
+
+function encTile(t, show) { return `${t.id}${t.color}${show ? (t.joker ? 'J' : t.num) : '?'}${t.revealed ? '*' : ''}`; }
+function publish() {
+  if (!NET || !NET.conn) return;
+  S.ver = (S.ver || 0) + 1;
+  const w = [];
+  for (const id in S.wrong) w.push([+id, [...S.wrong[id]]]);
+  const st = {
+    gid: S.gid, v: S.ver, ph: S.phase, cur: S.cur, dk: S.deck.length, dr: S.drawn ? S.drawn.id : -1,
+    dt: S.drawn ? encTile(S.drawn, S.cur === 1 || S.over) : null,
+    h: [S.players[0].hand.map(t => encTile(t, t.revealed || S.over)), S.players[1].hand.map(t => encTile(t, true))],
+    n: [S.players[0].name, S.players[1].name], w, lg: S.logq, fx: S.fxq, ov: S.over ? S.winner : -1,
+  };
+  send({ t: 'st', st });
+}
+
+function decTile(s) {
+  const m = /^(\d+)([BW])(\d+|J|\?)(\*?)$/.exec(String(s));
+  if (!m) return null;
+  const v = m[3];
+  return { id: +m[1], color: m[2], num: v === 'J' || v === '?' ? null : +v, joker: v === 'J', revealed: m[4] === '*' };
+}
+
+function guestApply(st) {
+  if (!st || typeof st !== 'object' || !Array.isArray(st.h) || st.h.length !== 2) return;
+  if (st.gid !== NET.gid) {
+    NET.gid = st.gid; NET.lastLog = 0; NET.lastFx = 0; NET.lastV = -1; NET.wasOver = false;
+    $('log').textContent = '';
+    ['menu', 'overOv', 'waitOv', 'noticeOv', 'pickerOv'].forEach(id => $(id).hidden = true);
+  }
+  if (st.v === NET.lastV) return;
+  NET.lastV = st.v; NET.pending = false;
+  const hands = st.h.map(arr => (Array.isArray(arr) ? arr : []).map(decTile).filter(Boolean));
+  const names = Array.isArray(st.n) ? st.n.map(x => String(x).slice(0, 10)) : ['방장', '나'];
+  const wrong = {};
+  if (Array.isArray(st.w)) for (const e of st.w) if (Array.isArray(e) && Array.isArray(e[1])) wrong[e[0]] = new Set(e[1]);
+  const all = hands.flat();
+  const fx = {};
+  for (const e of Array.isArray(st.fx) ? st.fx : []) if (Array.isArray(e) && e[0] > NET.lastFx) { NET.lastFx = e[0]; fx[e[1]] = e[2] === 'ok' ? 'ok' : 'bad'; beep(fx[e[1]]); }
+  for (const e of Array.isArray(st.lg) ? st.lg : []) if (Array.isArray(e) && e[0] > NET.lastLog) { NET.lastLog = e[0]; logLine(String(e[1]), ['ok', 'bad', 'sys'].includes(e[2]) ? e[2] : ''); }
+  const ov = Number.isInteger(st.ov) && st.ov >= 0 ? st.ov : -1;
+  S = {
+    mode: 'online', gid: st.gid, players: [{ name: names[0], ai: false, hand: hands[0] }, { name: names[1], ai: false, hand: hands[1] }],
+    cur: st.cur === 1 ? 1 : 0, phase: String(st.ph), deck: { length: +st.dk || 0 }, drawn: all.find(t => t.id === st.dr) || (st.dt ? decTile(st.dt) : null),
+    wrong, fx, fxq: [], logq: [], over: ov >= 0, winner: ov >= 0 ? ov : null, busy: false, handover: false,
+  };
+  render();
+  if (S.over && !NET.wasOver) { NET.wasOver = true; beep('win'); setTimeout(showOver, 900); }
+}
+
+function hostRematch() {
+  if (!NET || !NET.conn || !NET.conn.open) { showNotice('상대가 없어요', '상대와의 연결이 끊겼어요.'); return; }
+  newGame('online', null, [NET.name, NET.guestName]);
+}
+
+function showNotice(title, text) {
+  $('noticeTitle').textContent = title; $('noticeText').textContent = text;
+  ['waitOv', 'pickerOv', 'overOv', 'menu'].forEach(id => $(id).hidden = true);
+  $('noticeOv').hidden = false;
+}
+
+function peerErrorText(e) {
+  const t = e && e.type;
+  if (t === 'peer-unavailable') return '방을 찾을 수 없어요. 코드를 확인하고, 방장이 페이지를 열어둔 상태인지 확인해 주세요.';
+  if (t === 'network' || t === 'server-error' || t === 'socket-error' || t === 'socket-closed') return '연결 서버에 접속하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.';
+  if (t === 'browser-incompatible') return '이 브라우저는 온라인 대전을 지원하지 않아요. 크롬이나 사파리 최신 버전을 써 주세요.';
+  return '연결 중 문제가 생겼어요. (' + (t || e) + ')';
+}
+
+function startHost(retry = 0) {
+  if (typeof Peer === 'undefined') { netMsg('연결 모듈을 불러오지 못했어요. 새로고침해 주세요.'); return; }
+  leaveOnline();
+  const code = newCode();
+  const peer = new Peer(PEER_PREFIX + code, PEER_OPTS);
+  NET = { role: 'host', me: 0, code, name: nick('방장'), peer, conn: null };
+  const n = NET;
+  S = null;
+  $('menu').hidden = true;
+  $('waitTitle').textContent = '방 만드는 중…';
+  $('waitCode').textContent = code;
+  $('waitText').textContent = '';
+  $('copyBtn').hidden = true;
+  netStatus('연결 서버에 접속하는 중…');
+  $('waitOv').hidden = false;
+  peer.on('open', () => {
+    if (NET !== n) return;
+    $('waitTitle').textContent = '방을 만들었어요';
+    $('waitText').textContent = '[초대 링크 복사]를 눌러 친구에게 링크를 보내세요. 친구가 링크를 열고 [참가]를 누르면 바로 시작돼요. (방 코드를 직접 알려줘도 돼요)';
+    $('copyBtn').hidden = false;
+    netStatus('친구를 기다리는 중… 이 화면을 닫지 마세요.');
+  });
+  peer.on('connection', conn => {
+    if (NET !== n) { conn.close(); return; }
+    if (n.conn && n.conn.open) { conn.on('open', () => { conn.send({ t: 'full' }); setTimeout(() => conn.close(), 500); }); return; }
+    n.conn = conn; n.lastSeq = 0;
+    conn.on('open', () => startHeartbeat(n));
+    conn.on('data', d => {
+      if (NET !== n || !d || typeof d !== 'object') return;
+      n.seen = Date.now();
+      if (d.t === 'hello') {
+        n.guestName = String(d.name || '친구').slice(0, 10);
+        newGame('online', null, [n.name, n.guestName]);
+      } else if (d.t === 'act' && d.act && Number.isInteger(d.act.seq) && d.act.seq > n.lastSeq) {
+        const a = d.act; n.lastSeq = a.seq;
+        if (S && S.mode === 'online' && a.gid === S.gid && S.cur === 1 && !S.over) applyAct(String(a.type), a.a, a.b, a.c);
+        else render();
+      } else if (d.t === 'sync') render();
+    });
+    conn.on('close', () => {
+      if (NET !== n || n.conn !== conn) return;
+      n.conn = null;
+      if (S && S.mode === 'online' && !S.over) showNotice('상대가 나갔어요', `${n.guestName || '상대'}님의 연결이 끊겼어요.`);
+    });
+  });
+  peer.on('disconnected', () => { if (NET === n) try { peer.reconnect(); } catch (e) {} });
+  peer.on('error', e => {
+    if (NET !== n) return;
+    if (e.type === 'unavailable-id' && retry < 3) { startHost(retry + 1); return; }
+    if (e.type === 'peer-unavailable') return;
+    leaveOnline(); showNotice('연결 실패', peerErrorText(e));
+  });
+}
+
+function startJoin() {
+  if (typeof Peer === 'undefined') { netMsg('연결 모듈을 불러오지 못했어요. 새로고침해 주세요.'); return; }
+  const code = $('codeIn').value.trim().toUpperCase();
+  if (!/^[A-Z]{4}$/.test(code)) { netMsg('방 코드 4글자를 입력하세요.'); return; }
+  leaveOnline();
+  const peer = new Peer(PEER_OPTS);
+  NET = { role: 'guest', me: 1, code, name: nick('친구'), peer, conn: null, seq: 0, pending: false, gid: null };
+  const n = NET;
+  S = null;
+  $('menu').hidden = true;
+  $('waitTitle').textContent = '방에 연결하는 중…';
+  $('waitCode').textContent = code;
+  $('waitText').textContent = '잠시만 기다려 주세요.';
+  $('copyBtn').hidden = true;
+  netStatus('연결 서버에 접속하는 중…');
+  $('waitOv').hidden = false;
+  n.timer = setTimeout(() => {
+    if (NET === n && !n.gid) { leaveOnline(); showNotice('연결 실패', '방장과 연결되지 않았어요. 둘 다 새로고침한 뒤 다시 시도해 주세요. 회사·학교 와이파이에서는 막힐 수 있으니 휴대폰 데이터로도 시도해 보세요.'); }
+  }, 20000);
+  peer.on('open', () => {
+    if (NET !== n) return;
+    netStatus('방장에게 연결하는 중…');
+    const conn = peer.connect(PEER_PREFIX + code, { reliable: true });
+    n.conn = conn;
+    conn.on('open', () => { if (NET === n) { netStatus('연결됨! 게임을 준비하는 중…'); conn.send({ t: 'hello', name: n.name }); startHeartbeat(n); } });
+    conn.on('data', d => {
+      if (NET !== n || !d || typeof d !== 'object') return;
+      n.seen = Date.now();
+      if (d.t === 'st') { if (n.timer) { clearTimeout(n.timer); n.timer = null; } guestApply(d.st); }
+      else if (d.t === 'full') { leaveOnline(); showNotice('참가할 수 없어요', '이미 다른 사람이 참가한 방이에요.'); }
+    });
+    conn.on('close', () => {
+      if (NET !== n) return;
+      if (S && S.mode === 'online' && !S.over) showNotice('방장이 나갔어요', '방장과의 연결이 끊겼어요.');
+    });
+  });
+  peer.on('error', e => { if (NET !== n) return; leaveOnline(); showNotice('연결 실패', peerErrorText(e)); });
+}
+
+// 연결 확인 (3초마다 신호, 12초 응답 없으면 끊김 처리)
+function startHeartbeat(n) {
+  n.seen = Date.now();
+  if (n.hb) clearInterval(n.hb);
+  n.hb = setInterval(() => {
+    if (NET !== n) { clearInterval(n.hb); return; }
+    send({ t: 'ping' });
+    if (n.conn && Date.now() - n.seen > 12000) {
+      const c = n.conn; n.conn = null;
+      try { c.close(); } catch (e) {}
+      if (S && S.mode === 'online' && !S.over) showNotice(n.role === 'host' ? '상대가 나갔어요' : '방장이 나갔어요', '상대와의 연결이 끊겼어요.');
+    }
+  }, 3000);
+}
+
+// 초대 링크(#코드)로 들어온 경우
+function readInvite() {
+  const code = (location.hash || '').replace('#', '').toUpperCase();
+  if (/^[A-Z]{4}$/.test(code)) {
+    $('codeIn').value = code;
+    netMsg(`초대받은 방 코드: ${code} — 닉네임을 쓰고 [참가]를 누르세요.`);
+    $('onlineBox').scrollIntoView({ block: 'center' });
+  } else netMsg('');
+}
+setTimeout(() => {
+  if (typeof Peer === 'undefined') netMsg('연결 모듈을 불러오지 못했어요. 새로고침해 주세요.');
+  else { $('hostBtn').disabled = $('joinBtn').disabled = false; readInvite(); }
+}, 0);
+window.addEventListener('hashchange', readInvite);
+
+/* ---------- 이벤트 ---------- */
+$('diffSel').onclick = e => {
+  const d = e.target.dataset.d; if (!d) return;
+  selDiff = d;
+  [...$('diffSel').children].forEach(b => b.classList.toggle('sel', b.dataset.d === d));
+};
+$('hostBtn').onclick = startHost;
+$('joinBtn').onclick = startJoin;
+$('codeIn').onkeydown = e => { if (e.key === 'Enter') startJoin(); };
+$('copyBtn').onclick = async () => {
+  const link = inviteLink(NET.code);
+  try { await navigator.clipboard.writeText(link); $('copyBtn').textContent = '복사했어요 ✓'; }
+  catch (e) { $('waitText').textContent = '이 링크를 친구에게 보내세요: ' + link; }
+  setTimeout(() => $('copyBtn').textContent = '초대 링크 복사', 2000);
+};
+$('waitCancel').onclick = () => { leaveOnline(); $('waitOv').hidden = true; $('menu').hidden = false; };
+$('noticeBtn').onclick = () => { leaveOnline(); $('noticeOv').hidden = true; $('menuClose').hidden = true; $('menu').hidden = false; };
+$('goPvp').onclick = () => newGame('pvp');
+$('goAi').onclick = () => newGame('ai', selDiff);
+$('hoBtn').onclick = () => { $('handover').hidden = true; S.handover = false; render(); if (S.players[S.cur].ai) aiTurn(); };
+$('pkCancel').onclick = () => $('pickerOv').hidden = true;
+$('menuBtn').onclick = () => { if (S && S.mode === 'online' && !S.over) { $('menuClose').hidden = false; $('menu').hidden = false; return; } $('menuClose').hidden = !S || S.over; $('menu').hidden = false; };
+$('menuClose').onclick = () => $('menu').hidden = true;
+$('againBtn').onclick = () => { if (S.mode === 'online') hostRematch(); else newGame(lastSettings.mode, lastSettings.diff); };
+$('toMenuBtn').onclick = () => { leaveOnline(); $('overOv').hidden = true; $('menuClose').hidden = true; $('menu').hidden = false; };
+$('rulesBtn').onclick = () => $('rulesOv').hidden = false;
+$('rulesClose').onclick = () => $('rulesOv').hidden = true;
+$('hintChk').onchange = render;
+$('soundBtn').onclick = () => { soundOn = !soundOn; $('soundBtn').textContent = soundOn ? '🔊' : '🔇'; };
+
+window.__dv = { get S() { return S; }, get NET() { return NET; }, newGame, drawTile, doGuess, candidates, placeJoker, finishTurn, revealOwn };
+})();
+</script>
+</body>
+</html>
