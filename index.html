@@ -115,6 +115,63 @@ aside h3{margin:0 0 8px;font-size:14px;color:var(--muted)}
 .final .tile{width:32px;height:48px;font-size:16px}
 .final .tile.open{transform:none}
 .big-score{font-size:40px;font-weight:800;color:var(--gold);margin:6px 0}
+
+#dock{display:flex;flex-direction:column;gap:12px}
+.hs{display:none}
+.tile .q{position:absolute;left:20%;right:20%;top:14%;bottom:20%;width:auto;height:auto}
+@media (max-width:600px){
+  .hl{display:none}.hs{display:inline}
+  header{padding:8px 10px;gap:6px;flex-wrap:nowrap}
+  header h1{font-size:16px;white-space:nowrap}
+  #modeInfo{display:none}
+  header button{padding:6px 10px}
+  .toggle{font-size:12px;white-space:nowrap}
+  main{padding:0 8px 16px;gap:10px}
+  .board{gap:8px}
+  #others{gap:6px}
+  #others.multi{grid-template-columns:1fr}
+  .seat{padding:8px 10px;border-radius:12px}
+  .seat h2{font-size:13px;margin:0 0 2px;gap:4px}
+  .seat h2 small{font-size:11px}
+  .tag{font-size:10px;padding:1px 6px}
+  .row{gap:5px;min-height:0;padding-top:10px;padding-bottom:2px}
+  #others .tile{width:34px;height:50px;font-size:17px;border-radius:6px}
+  #others .tile .mk{font-size:9px;bottom:2px}
+  #others .tile .pos{display:none}
+  #others .tile.open{transform:translateY(3px) rotate(-4deg)}
+  #others.multi .row{padding-top:8px}
+  #meSeat .tile{width:42px;height:62px;font-size:21px}
+  #meSeat .tile .mk{font-size:10px;bottom:3px}
+  .tile .badge{font-size:9px;top:-9px;padding:0 4px}
+  .slot{width:16px;height:62px}
+  #dock{position:sticky;bottom:0;z-index:5;gap:8px;margin:0 -8px;padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:#13261d;border-top:1px solid rgba(224,180,76,.35);box-shadow:0 -10px 24px rgba(0,0,0,.45);border-radius:16px 16px 0 0}
+  .center{gap:10px;padding:0;flex-wrap:nowrap;align-items:flex-start}
+  .deck{width:42px;height:58px;font-size:16px;border-radius:7px}
+  .deck small{font-size:8px}
+  .status{min-width:0}
+  .status .msg{font-size:14px;margin-bottom:2px}
+  .status .sub{font-size:12px;margin-bottom:6px;min-height:0}
+  .actions{gap:6px}
+  .actions button{padding:8px 12px;font-size:13px}
+  #meSeat{padding:6px 10px}
+  aside{max-height:none;padding:10px 12px}
+  .rulebox{font-size:11px}
+  .log div{font-size:12px;padding:4px 0}
+  .card{padding:18px 14px;border-radius:16px}
+  .card.wide{padding:18px 14px}
+  #modeSeg{display:grid;grid-template-columns:1fr 1fr}
+  .seg.big button{padding:10px 4px;font-size:14px}
+  .optgrid{grid-template-columns:1fr;gap:4px;margin:12px 0 4px}
+  .optgrid>label{margin-top:8px;font-size:12px}
+  .optgrid .line{flex-wrap:nowrap}
+  #nSeg{flex:1}
+  .seg button{padding:8px 4px;font-size:13px}
+  .optgrid .line select{flex:1;width:0}
+  #ruleLine{flex-wrap:wrap !important;gap:10px}
+  .picker{gap:6px}
+  .picker button{padding:12px 0;font-size:18px}
+  .code{font-size:36px}
+}
 </style>
 </head>
 <body>
@@ -122,15 +179,16 @@ aside h3{margin:0 0 8px;font-size:14px;color:var(--muted)}
   <h1>🔢 다빈치 코드</h1>
   <span class="pill" id="modeInfo">-</span>
   <span class="sp"></span>
-  <label class="toggle"><input type="checkbox" id="hintChk" checked> 불가능한 값 흐리게</label>
+  <label class="toggle"><input type="checkbox" id="hintChk" checked> <span class="hl">불가능한 값 흐리게</span><span class="hs">힌트</span></label>
   <button id="soundBtn">🔊</button>
-  <button id="rulesBtn">규칙</button>
+  <button id="rulesBtn"><span class="hl">규칙</span><span class="hs">?</span></button>
   <button id="menuBtn">새 게임</button>
 </header>
 
 <main>
   <div class="board">
     <div id="others"></div>
+    <div id="dock">
     <section class="center">
       <div class="deck" id="deck"><span id="deckCount">0</span><small>남은 타일</small></div>
       <div class="status">
@@ -140,6 +198,7 @@ aside h3{margin:0 0 8px;font-size:14px;color:var(--muted)}
       </div>
     </section>
     <section class="seat" id="meSeat"></section>
+    </div>
   </div>
   <aside><div class="rulebox" id="ruleBox"></div><h3>게임 기록</h3><div class="log" id="log"></div></aside>
 </main>
@@ -171,7 +230,7 @@ aside h3{margin:0 0 8px;font-size:14px;color:var(--muted)}
       <label data-for="ai local online">타이머</label>
       <div class="seg" id="timerSeg" data-for="ai local online"><button data-v="0" class="sel">끔</button><button data-v="20">20초</button><button data-v="40">40초</button></div>
       <label>규칙 옵션</label>
-      <div class="line">
+      <div class="line" id="ruleLine">
         <label class="chk" id="parityWrap"><input type="checkbox" id="parityChk"> <span id="parityText">홀짝 표시</span></label>
         <label class="chk" data-for="ai local online"><input type="checkbox" id="askChk"> 질문 찬스 1회</label>
         <label class="chk" data-for="ai local online"><input type="checkbox" id="hardChk"> 하드코어</label>
