@@ -219,8 +219,12 @@ aside h3{margin:0 0 8px;font-size:14px;color:var(--muted)}
         <div class="seg" id="nSeg" style="flex:1"><button data-v="2" class="sel">2명</button><button data-v="3">3명</button><button data-v="4">4명</button></div>
         <label class="chk" id="teamWrap"><input type="checkbox" id="teamChk"> 2:2 팀전</label>
       </div>
-      <label data-for="ai online">AI 난이도</label>
-      <div class="seg" id="diffSeg" data-for="ai online"><button data-v="easy">쉬움</button><button data-v="normal" class="sel">보통</button><button data-v="hard">어려움</button></div>
+      <label data-for="local">그중 AI</label>
+      <div class="line" data-for="local"><div class="seg" id="aiSeg" style="flex:1"><button data-v="0" class="sel">없음</button><button data-v="1">AI 1명</button><button data-v="2">AI 2명</button></div></div>
+      <label data-for="local online" class="tmixRow">팀 구성</label>
+      <div class="seg tmixRow" id="tmixSeg" data-for="local online"><button data-v="vs" class="sel">사람 팀 vs AI 팀</button><button data-v="mix">사람+AI 섞기</button></div>
+      <label data-for="ai local online" id="diffLabel">AI 난이도</label>
+      <div class="seg" id="diffSeg" data-for="ai local online"><button data-v="easy">쉬움</button><button data-v="normal" class="sel">보통</button><button data-v="hard">어려움</button></div>
       <label>덱</label>
       <div class="line"><select id="deckSel"></select><select id="subSel"></select></div>
       <label id="startLabel">시작 타일</label>
@@ -427,12 +431,12 @@ const jokerCount = cfg => (cfg.parity && deckSpec(cfg).mark) ? 0 : cfg.jokers;
 function jokersOf(c) { const n = S.jk || 0, cs = D().colors; let k = 0; for (let i = 0; i < n; i++) if (cs[i % cs.length] === c) k++; return k; }
 
 /* ================= 설정 ================= */
-const DEFAULT_CFG = { mode: 'ai', n: 2, team: false, diff: 'normal', deck: 'classic', sub: 12, start: 0, jokers: 2, timer: 0, parity: false, ask: false, hard: false };
+const DEFAULT_CFG = { mode: 'ai', n: 2, ais: 0, tmix: 'vs', team: false, diff: 'normal', deck: 'classic', sub: 12, start: 0, jokers: 2, timer: 0, parity: false, ask: false, hard: false };
 let CFG = { ...DEFAULT_CFG };
 try { Object.assign(CFG, JSON.parse(localStorage.getItem('dvc-cfg') || '{}')); } catch (e) {}
 function saveCfg() { try { localStorage.setItem('dvc-cfg', JSON.stringify(CFG)); } catch (e) {} }
 function gameCfg(c = CFG) {
-  return { n: c.n, team: c.n === 4 && c.team, diff: c.diff, deck: c.deck, sub: DECKS[c.deck] && DECKS[c.deck].sub ? c.sub : null, start: c.start, jokers: c.jokers, timer: c.timer, parity: c.parity, ask: c.ask, hard: c.hard };
+  return { n: c.n, team: c.n === 4 && c.team, tmix: c.tmix || 'vs', diff: c.diff, deck: c.deck, sub: DECKS[c.deck] && DECKS[c.deck].sub ? c.sub : null, start: c.start, jokers: c.jokers, timer: c.timer, parity: c.parity, ask: c.ask, hard: c.hard };
 }
 
 /* ================= 엔진 ================= */
@@ -498,7 +502,8 @@ function newGame(mode, cfg, seats, opts = {}) {
     render(); return;
   }
   addLog(`게임 시작! ${P(S.cur).name}부터 시작합니다.`, 'sys');
-  if (mode === 'local') { S.handover = true; showHandover(); }
+  S.viewSeat = null;
+  if (mode === 'local' && !P(S.cur).ai) { S.handover = true; showHandover(); }
   startTurn();
 }
 
@@ -615,7 +620,11 @@ function doAsk(tp, ti, x) {
 function finishTurn() {
   S.drawn = null;
   S.cur = nextSeat(S.cur);
-  if (S.mode === 'local') { S.handover = true; S.deadline = null; render(); showHandover(); }
+  if (S.mode === 'local' && !P(S.cur).ai) {
+    const vs = S.viewSeat;
+    if (vs === S.cur || (vs != null && S.cfg.team && teamOf(vs) === teamOf(S.cur))) S.viewSeat = S.cur;
+    else { S.handover = true; S.deadline = null; render(); showHandover(); }
+  }
   startTurn();
 }
 
@@ -855,8 +864,16 @@ function applyAct(type, a, b, c) {
 /* ================= 화면 ================= */
 function viewer() {
   if (S.mode === 'online') return NET ? NET.me : 0;
-  if (S.mode === 'local') return S.cur;
+  if (S.mode === 'local') return S.viewSeat != null ? S.viewSeat : S.players.findIndex(p => !p.ai);
   return 0;
+}
+function concealMine() {
+  if (!S || S.over) return false;
+  if (S.handover) return true;
+  if (S.mode !== 'local') return false;
+  if (S.viewSeat == null) return true;
+  // AI 차례: 화면을 같이 보는 다른 팀 사람이 있으면 내 타일을 가림
+  return P(S.cur).ai && S.players.some(p => !p.ai && !p.out && p.seat !== S.viewSeat && isOpp(p.seat, S.viewSeat));
 }
 function isMyTurn() {
   const v = viewer();
@@ -913,7 +930,7 @@ function render() {
     const row = document.createElement('div'); row.className = 'row';
     const canTarget = myTurn && (S.phase === 'guess' || S.phase === 'decide') && (S.mode === 'puzzle' || isOpp(v, s)) && !p.out;
     p.hand.forEach((t, i) => {
-      const el = tileEl(t, t.r || S.over || sees(v, s), { idx: i, small: n > 2 });
+      const el = tileEl(t, t.r || S.over || (sees(v, s) && !concealMine()), { idx: i, small: n > 2 });
       if (canTarget && !t.r && (!UI.askMode || S.phase === 'guess')) { el.classList.add('click'); el.onclick = () => UI.askMode ? openAsk(s, i) : openPicker(s, i); }
       row.appendChild(el);
     });
@@ -925,7 +942,7 @@ function render() {
   meSeat.className = 'seat' + (S.cur === v && !S.over && S.mode !== 'puzzle' ? ' active' : '') + (me.out ? ' out' : '');
   meSeat.innerHTML = `<h2>${seatHeader(me, true)}</h2>`;
   const meRow = document.createElement('div'); meRow.className = 'row';
-  const conceal = S.handover;
+  const conceal = concealMine();
   const placing = myTurn && S.phase === 'placeJoker';
   const slot = i => { const b = document.createElement('button'); b.className = 'slot'; b.textContent = '+'; b.title = '여기에 조커 놓기'; b.onclick = () => act('joker', i); return b; };
   me.hand.forEach((t, i) => {
@@ -1003,7 +1020,8 @@ function modeLabel() {
   const c = S.cfg, deckName = DECKS[c.deck] ? DECKS[c.deck].name : '';
   if (S.mode === 'puzzle') return S.daily ? `오늘의 문제 · ${S.daily}` : `연습 퍼즐 · ${deckName}`;
   const m = { ai: 'AI 대전', local: '한 화면', online: `온라인 · 방 ${NET ? NET.code : ''}` }[S.mode];
-  return `${m} · ${S.players.length}명${c.team ? ' 팀전' : ''} · ${deckName}`;
+  const aiN = S.players.filter(p => p.ai).length;
+  return `${m} · ${S.players.length}명${aiN && S.mode !== 'ai' ? `(AI ${aiN})` : ''}${c.team ? ' 팀전' : ''} · ${deckName}`;
 }
 function renderRuleBox() {
   const c = S.cfg, d = S.D, bits = [];
@@ -1212,13 +1230,10 @@ function hostStart() {
   if (!NET || NET.role !== 'host') return;
   NET.started = true;
   const seated = NET.guests.filter(g => g.seat != null);
-  // 자리 다시 매기기: 방장 0, 손님 1.., 나머지 AI
-  seated.forEach((g, i) => g.seat = i + 1);
-  const seats = [{ name: NET.name }];
-  seated.forEach(g => seats.push({ name: g.name }));
-  let k = 1;
-  while (seats.length < NET.cfg.n) seats.push({ name: `AI ${k++}`, ai: true, diff: NET.cfg.diff });
-  newGame('online', NET.cfg, seats);
+  const humans = [{ name: NET.name, host: true }, ...seated.map(g => ({ name: g.name, g }))];
+  const seats = arrange(humans, NET.cfg);
+  seats.forEach((st, i) => { if (st.g) st.g.seat = i; });
+  newGame('online', NET.cfg, seats.map(st => ({ name: st.name, ai: !!st.ai, diff: st.diff })));
 }
 
 function hostRematch() {
@@ -1386,7 +1401,7 @@ function segInit(id, key, parse = x => x) {
 function setMode(m) { CFG.mode = m; saveCfg(); syncMenu(); }
 function syncMenu() {
   const m = CFG.mode;
-  for (const [id, k] of [['modeSeg', 'mode'], ['nSeg', 'n'], ['diffSeg', 'diff'], ['startSeg', 'start'], ['jokerSeg', 'jokers'], ['timerSeg', 'timer']])
+  for (const [id, k] of [['aiSeg', 'ais'], ['tmixSeg', 'tmix'], ['modeSeg', 'mode'], ['nSeg', 'n'], ['diffSeg', 'diff'], ['startSeg', 'start'], ['jokerSeg', 'jokers'], ['timerSeg', 'timer']])
     [...$(id).children].forEach(b => b.classList.toggle('sel', String(CFG[k]) === b.dataset.v));
   document.querySelectorAll('#menu [data-for]').forEach(el => el.style.display = el.dataset.for.split(' ').includes(m) ? '' : 'none');
   // 덱
@@ -1401,6 +1416,13 @@ function syncMenu() {
     if (!sub.opts.some(o => o[0] === +CFG.sub)) CFG.sub = sub.def;
     ss.value = CFG.sub;
   }
+  const maxAi = Math.max(0, CFG.n - 2);
+  if ((CFG.ais || 0) > maxAi) CFG.ais = maxAi;
+  [...$('aiSeg').children].forEach(b => { b.disabled = +b.dataset.v > maxAi; b.classList.toggle('sel', String(CFG.ais || 0) === b.dataset.v); });
+  const teamOn = CFG.n === 4 && CFG.team;
+  const showTmix = teamOn && ((m === 'local' && CFG.ais === 2) || m === 'online');
+  document.querySelectorAll('#menu .tmixRow').forEach(el => { if (!showTmix) el.style.display = 'none'; });
+  if (m === 'local' && !CFG.ais) { $('diffLabel').style.display = 'none'; $('diffSeg').style.display = 'none'; }
   $('teamWrap').classList.toggle('dis', CFG.n !== 4);
   $('teamChk').disabled = CFG.n !== 4;
   $('teamChk').checked = CFG.team && CFG.n === 4;
@@ -1416,11 +1438,22 @@ function syncMenu() {
     if (CFG.parity && spec.mark && CFG.jokers) notes.push('홀짝 표시를 켜면 조커는 빠져요');
     if (CFG.start === 0) notes.push(`시작 타일 자동: ${CFG.n <= 3 ? 4 : 3}개`);
   } else if (CFG.start === 0) notes.push('자동: 5개');
-  if (m === 'online') notes.push('AI 난이도는 빈 자리를 채울 AI에 적용돼요');
+  if (m === 'local') notes.push(`사람 ${CFG.n - (CFG.ais || 0)}명${CFG.ais ? ` + AI ${CFG.ais}명` : ''}이 한 기기로 번갈아 해요`);
+  if (m === 'online') notes.push('사람이 덜 모이면 [지금 시작]으로 빈 자리를 AI로 채울 수 있어요. AI 난이도는 그 AI에 적용돼요');
+  if (showTmix && m === 'online') notes.push('팀 구성은 사람 2명 + AI 2명일 때 적용돼요');
   $('cfgNote').textContent = notes.join(' · ');
   bestInfo();
 }
 
+/* 사람/AI 자리 배치. humans: [{name,...}] → seats 배열 */
+function arrange(humans, cfg) {
+  const n = cfg.n, aiCount = n - humans.length;
+  const ais = range(aiCount).map(i => ({ name: `AI ${i + 1} (${DIFF_NAME[cfg.diff]})`, ai: true, diff: cfg.diff }));
+  if (cfg.team && n === 4 && humans.length === 2 && aiCount === 2)
+    return cfg.tmix === 'mix' ? [humans[0], humans[1], ais[0], ais[1]] : [humans[0], ais[0], humans[1], ais[1]];
+  if (cfg.team && n === 4 && humans.length === 3) return [humans[0], humans[1], humans[2], ais[0]];
+  return [...humans, ...ais];
+}
 function startLocalGame() {
   const c = gameCfg();
   if (CFG.mode === 'ai') {
@@ -1428,7 +1461,8 @@ function startLocalGame() {
     for (let i = 1; i < c.n; i++) seats.push({ name: c.team && i === 2 ? 'AI 팀원' : `${c.n > 2 ? 'AI ' + i : 'AI'} (${DIFF_NAME[c.diff]})`, ai: true, diff: c.diff });
     newGame('ai', c, seats);
   } else {
-    newGame('local', c, range(c.n).map(i => ({ name: `플레이어 ${i + 1}` })));
+    const ais = Math.min(CFG.ais || 0, c.n - 2);
+    newGame('local', c, arrange(range(c.n - ais).map(i => ({ name: `플레이어 ${i + 1}` })), c));
   }
 }
 
@@ -1436,6 +1470,8 @@ function startLocalGame() {
 segInit('modeSeg', 'mode');
 segInit('nSeg', 'n', Number);
 segInit('diffSeg', 'diff');
+segInit('aiSeg', 'ais', Number);
+segInit('tmixSeg', 'tmix');
 segInit('startSeg', 'start', Number);
 segInit('jokerSeg', 'jokers', Number);
 segInit('timerSeg', 'timer', Number);
@@ -1460,7 +1496,7 @@ $('copyBtn').onclick = async () => {
 $('fillBtn').onclick = () => hostStart();
 $('waitCancel').onclick = () => { leaveOnline(); $('waitOv').hidden = true; $('menuClose').hidden = true; $('menu').hidden = false; };
 $('noticeBtn').onclick = () => { leaveOnline(); $('noticeOv').hidden = true; $('menuClose').hidden = true; $('menu').hidden = false; };
-$('hoBtn').onclick = () => { $('handover').hidden = true; S.handover = false; setDeadline(); render(); };
+$('hoBtn').onclick = () => { $('handover').hidden = true; S.handover = false; S.viewSeat = S.cur; setDeadline(); render(); };
 $('pkCancel').onclick = () => $('pickerOv').hidden = true;
 $('menuBtn').onclick = () => { $('menuClose').hidden = !S || S.over; syncMenu(); $('menu').hidden = false; };
 $('menuClose').onclick = () => $('menu').hidden = true;
